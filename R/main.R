@@ -56,13 +56,14 @@ elisa_results <- ELISA_data$ELISA_enriched %>%
                                         TRUE ~ NA),
          `Detection target NCBI tax ID` = case_when(!is.na(interpretation) ~ LASV,
                                                     TRUE ~ NA),
-         `Detection outcome` = str_to_lower(interpretation),
+         `Detection outcome` = case_when(interpretation == "Equivocal" ~ "inconclusive",
+                                         TRUE ~ str_to_lower(interpretation)),
          `Detection measurement` = result,
          `Detection measurement units` = case_when(!is.na(interpretation) ~ "Optical density 450 - 630",
                                                    TRUE ~ NA),
          `Pathogen` = case_when(!is.na(interpretation) ~ "Lassa mammarenavirus",
                                 TRUE ~ NA),
-         `Pathogen NCBI tax id` = case_when(!is.na(interpretation) ~ LASV,
+         `Pathogen NCBI tax ID` = case_when(!is.na(interpretation) ~ LASV,
                                 TRUE ~ NA)) %>%
   select(-interpretation, -result)
 
@@ -72,14 +73,14 @@ pharos_template <- read_csv(here("data", "pharos_template.csv"))
 # Produce the final dataset
 pharos_data <- tibble(
   `Sample ID` =  combined_data$rodent_data$rodent_uid,
-  `Organism ID` = combined_data$rodent_data$rodent_uid,
+  `Animal ID` = combined_data$rodent_data$rodent_uid,
   `Host species` = str_to_sentence(str_replace_all(combined_data$rodent_data$clean_names, "_", " "))) %>%
   left_join(ncbi_id, by = c("Host species" = "species_name")) %>%
   rename(`Host species NCBI tax ID` = ncbi_tax_id) %>%
-  left_join(rodent_coords, by = c("Organism ID" = "rodent_uid")) %>%
+  left_join(rodent_coords, by = c("Animal ID" = "rodent_uid")) %>%
   mutate(`Spatial uncertainty` = 10) %>%
-  left_join(rodent_dates, by = c("Organism ID" = "rodent_uid")) %>%
-  left_join(elisa_results, by = c("Organism ID" = "rodent_uid")) %>%
+  left_join(rodent_dates, by = c("Animal ID" = "rodent_uid")) %>%
+  left_join(elisa_results, by = c("Animal ID" = "rodent_uid")) %>%
   mutate(`Organism sex` = combined_data$rodent_data$sex,
          `Dead or alive` = "alive",
          `Health notes` = "Length refers to head-body length of trapped rodents and shrews",
@@ -87,10 +88,13 @@ pharos_data <- tibble(
          `Life stage` = combined_data$rodent_data$age_group,
          `Life stage` = case_when(`Life stage` == "not_known" ~ "unknown",
                                   TRUE ~ `Life stage`),
-         `Age` = NA,
+         `Age` = " ", # blanks needed instead of NA
          # convert mass from grams to kg
          `Mass` = combined_data$rodent_data$weight/1000,
          # convert length from mm to m
-         `Length` = combined_data$rodent_data$head_body/1000)
+         `Length` = combined_data$rodent_data$head_body/1000) %>%
+  rename(`Longitude` = Latitude,
+         `Latitude` = Longitude) %>%
+  drop_na(`Detection outcome`)
 
-write_csv(pharos_data, here("data", "rodent_eastern_sl_2023-06-22.csv"))
+write_csv(pharos_data, here("data", "rodent_eastern_sl_2023-08-11.csv"))
